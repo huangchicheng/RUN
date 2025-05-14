@@ -1,0 +1,192 @@
+﻿<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>興嘉國小運動登記</title>
+  <style>
+    body {
+      font-family: sans-serif;
+      padding: 1em;
+      max-width: 600px;
+      margin: auto;
+    }
+    h1 {
+      text-align: center;
+    }
+    label, select, input[type="date"] {
+      display: block;
+      width: 100%;
+      margin-bottom: 1em;
+      font-size: 1.1em;
+    }
+    .seats {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.5em;
+      justify-content: center;
+      margin-bottom: 1em;
+    }
+    .seat {
+      width: 3em;
+      height: 3em;
+      line-height: 3em;
+      text-align: center;
+      border: 1px solid #999;
+      border-radius: 5px;
+      cursor: pointer;
+      user-select: none;
+    }
+    .selected {
+      background-color: lightgreen;
+      font-weight: bold;
+    }
+    .used {
+      background-color: lightgray;
+      color: #666;
+      pointer-events: none;
+    }
+    button {
+      width: 100%;
+      padding: 1em;
+      font-size: 1.2em;
+      background-color: #007bff;
+      color: white;
+      border: none;
+      border-radius: 5px;
+      cursor: pointer;
+    }
+    button:hover {
+      background-color: #0056b3;
+    }
+  </style>
+</head>
+<body>
+  <h1>興嘉國小運動登記</h1>
+
+  <label for="date">選擇日期：</label>
+  <input type="date" id="date" />
+
+  <label for="class">選擇班級：</label>
+  <select id="class">
+    <option value="">-- 請選擇 --</option>
+  </select>
+
+  <label>完成運動的座號：</label>
+  <div class="seats" id="seats"></div>
+
+  <button id="submit">送出資料</button>
+
+  <script>
+    // ✅ 修改這個網址為你實際部署的 Apps Script 網址
+    const endpoint = "https://script.google.com/macros/s/你的部署ID/exec";
+
+    const today = new Date().toISOString().split('T')[0];
+    document.getElementById("date").value = today;
+
+    const urlParams = new URLSearchParams(window.location.search);
+    const fixedClass = urlParams.get("class");
+
+    const classSelect = document.getElementById("class");
+    const dateInput = document.getElementById("date");
+    const seatsEl = document.getElementById("seats");
+    const usedSeats = new Set();
+
+    // 建立座號按鈕
+    for (let i = 1; i <= 25; i++) {
+      const seat = document.createElement("div");
+      seat.className = "seat";
+      seat.dataset.seat = i;
+      seat.textContent = i;
+      seatsEl.appendChild(seat);
+    }
+
+    // 查詢已使用座號
+    async function fetchUsedSeats() {
+      usedSeats.clear();
+      document.querySelectorAll(".seat").forEach(el => {
+        el.classList.remove("selected", "used");
+        el.style.pointerEvents = "auto";
+      });
+
+      const className = classSelect.value;
+      const date = dateInput.value;
+      if (!className || !date) return;
+
+      try {
+        const response = await fetch(`${endpoint}?date=${date}&class=${className}`);
+        const data = await response.json();
+        data.forEach(seatNum => {
+          usedSeats.add(seatNum);
+          const seatEl = document.querySelector(`.seat[data-seat='${seatNum}']`);
+          if (seatEl) {
+            seatEl.classList.add("selected", "used");
+            seatEl.style.pointerEvents = "none";
+          }
+        });
+      } catch (e) {
+        console.error("查詢失敗", e);
+      }
+    }
+
+    // 初始化班級選單與查詢
+    if (fixedClass) {
+      classSelect.innerHTML = `<option value="${fixedClass}" selected>${fixedClass}</option>`;
+      classSelect.disabled = true;
+      fetchUsedSeats();
+    } else {
+      for (let grade = 1; grade <= 6; grade++) {
+        for (let cls = 1; cls <= 8; cls++) {
+          const option = document.createElement("option");
+          option.value = `${grade}年${cls}班`;
+          option.textContent = `${grade}年${cls}班`;
+          classSelect.appendChild(option);
+        }
+      }
+      classSelect.addEventListener("change", fetchUsedSeats);
+    }
+
+    dateInput.addEventListener("change", fetchUsedSeats);
+
+    seatsEl.addEventListener("click", (e) => {
+      if (e.target.classList.contains("seat") && !e.target.classList.contains("used")) {
+        e.target.classList.toggle("selected");
+      }
+    });
+
+    document.getElementById("submit").addEventListener("click", () => {
+      const date = dateInput.value;
+      const className = classSelect.value;
+      const selectedSeats = Array.from(document.querySelectorAll(".seat.selected"))
+        .map(el => parseInt(el.dataset.seat))
+        .filter(num => !usedSeats.has(num)); // 避免重複送出
+
+      if (!date || !className || selectedSeats.length === 0) {
+        alert("請選擇日期、班級，並至少勾選一個座號。");
+        return;
+      }
+
+      const payload = {
+        date,
+        className,
+        seats: selectedSeats
+      };
+
+      fetch("https://script.google.com/macros/s/AKfycbzhfnuos_IvTnHBGk-Qf0KUDJkeJkTUSyBv0VAwhyz6Tq16WZLsPGgBzTfLNIYmdVXQ/exec", {
+        method: "POST",
+        mode: "no-cors",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify(payload)
+      });
+
+      alert("資料已送出！");
+      fetchUsedSeats(); // 更新畫面
+    });
+
+    // 頁面載入時查詢
+    fetchUsedSeats();
+  </script>
+</body>
+</html>
