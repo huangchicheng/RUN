@@ -2,7 +2,7 @@
 <html lang="zh-TW">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>興嘉國小運動登記</title>
   <style>
     body {
@@ -11,9 +11,7 @@
       max-width: 600px;
       margin: auto;
     }
-    h1 {
-      text-align: center;
-    }
+    h1 { text-align: center; }
     label, select, input[type="date"] {
       display: block;
       width: 100%;
@@ -65,7 +63,7 @@
   <h1>興嘉國小運動登記</h1>
 
   <label for="date">選擇日期：</label>
-  <input type="date" id="date" />
+  <input type="date" id="date"/>
 
   <label for="class">選擇班級：</label>
   <select id="class">
@@ -78,21 +76,17 @@
   <button id="submit">送出資料</button>
 
   <script>
-    // ✅ 修改這個網址為你實際部署的 Apps Script 網址
-    const endpoint = "https://script.google.com/macros/s/你的部署ID/exec";
+    const scriptURL = "https://script.google.com/macros/s/YOUR_SCRIPT_URL/exec";
 
     const today = new Date().toISOString().split('T')[0];
     document.getElementById("date").value = today;
-
-    const urlParams = new URLSearchParams(window.location.search);
-    const fixedClass = urlParams.get("class");
 
     const classSelect = document.getElementById("class");
     const dateInput = document.getElementById("date");
     const seatsEl = document.getElementById("seats");
     const usedSeats = new Set();
 
-    // 建立座號按鈕
+    // 產生 1~25 座號按鈕
     for (let i = 1; i <= 25; i++) {
       const seat = document.createElement("div");
       seat.className = "seat";
@@ -101,7 +95,7 @@
       seatsEl.appendChild(seat);
     }
 
-    // 查詢已使用座號
+    // 查詢已登記座號（即時比對）
     async function fetchUsedSeats() {
       usedSeats.clear();
       document.querySelectorAll(".seat").forEach(el => {
@@ -109,43 +103,41 @@
         el.style.pointerEvents = "auto";
       });
 
-      const className = classSelect.value;
       const date = dateInput.value;
-      if (!className || !date) return;
+      const className = classSelect.value;
+      if (!date || !className) return;
 
       try {
-        const response = await fetch(`${endpoint}?date=${date}&class=${className}`);
-        const data = await response.json();
-        data.forEach(seatNum => {
-          usedSeats.add(seatNum);
-          const seatEl = document.querySelector(`.seat[data-seat='${seatNum}']`);
-          if (seatEl) {
-            seatEl.classList.add("selected", "used");
-            seatEl.style.pointerEvents = "none";
+        const url = `${scriptURL}?date=${encodeURIComponent(date)}&className=${encodeURIComponent(className)}`;
+        const response = await fetch(url);
+        const result = await response.json();
+        const seats = result.seats || [];
+
+        seats.forEach(seatNum => {
+          usedSeats.add(String(seatNum));
+          const el = document.querySelector(`.seat[data-seat='${seatNum}']`);
+          if (el) {
+            el.classList.add("used");
+            el.style.pointerEvents = "none";
           }
         });
-      } catch (e) {
-        console.error("查詢失敗", e);
+      } catch (err) {
+        console.error("取得已登記座號失敗", err);
       }
     }
 
-    // 初始化班級選單與查詢
-    if (fixedClass) {
-      classSelect.innerHTML = `<option value="${fixedClass}" selected>${fixedClass}</option>`;
-      classSelect.disabled = true;
-      fetchUsedSeats();
-    } else {
-      for (let grade = 1; grade <= 6; grade++) {
-        for (let cls = 1; cls <= 8; cls++) {
-          const option = document.createElement("option");
-          option.value = `${grade}年${cls}班`;
-          option.textContent = `${grade}年${cls}班`;
-          classSelect.appendChild(option);
-        }
+    // 初始化班級選單
+    for (let g = 1; g <= 6; g++) {
+      for (let c = 1; c <= 8; c++) {
+        const option = document.createElement("option");
+        option.value = `${g}年${c}班`;
+        option.textContent = option.value;
+        classSelect.appendChild(option);
       }
-      classSelect.addEventListener("change", fetchUsedSeats);
     }
 
+    // 事件監聽
+    classSelect.addEventListener("change", fetchUsedSeats);
     dateInput.addEventListener("change", fetchUsedSeats);
 
     seatsEl.addEventListener("click", (e) => {
@@ -154,38 +146,36 @@
       }
     });
 
-    document.getElementById("submit").addEventListener("click", () => {
+    document.getElementById("submit").addEventListener("click", async () => {
       const date = dateInput.value;
       const className = classSelect.value;
-      const selectedSeats = Array.from(document.querySelectorAll(".seat.selected"))
-        .map(el => parseInt(el.dataset.seat))
-        .filter(num => !usedSeats.has(num)); // 避免重複送出
+      const selected = Array.from(document.querySelectorAll(".seat.selected"))
+        .map(el => el.dataset.seat)
+        .filter(seat => !usedSeats.has(seat)); // 前端防止重複
 
-      if (!date || !className || selectedSeats.length === 0) {
-        alert("請選擇日期、班級，並至少勾選一個座號。");
+      if (!date || !className || selected.length === 0) {
+        alert("請選擇日期、班級，並至少選一個未登記的座號。");
         return;
       }
 
-      const payload = {
-        date,
-        className,
-        seats: selectedSeats
-      };
+      const payload = { date, className, seats: selected };
 
-      fetch("https://script.google.com/macros/s/AKfycbxQLPVLRc3CkAqxHqOLWyA5hcxVRI7hSdYU75T4Le2K4PKRnjbUXFa_lWvln-YxKqPm/exec", {
-        method: "POST",
-        mode: "no-cors",
-        headers: {
-          "Content-Type": "application/json"
-        },
-        body: JSON.stringify(payload)
-      });
+      try {
+        await fetch("https://script.google.com/macros/s/AKfycbxP_3CAbNyIgY8ajUcFeN7Mf8tUAmoLIDyQKqMo-zHFLONZbvz9bDezcX6828dz3UlA/exec", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload)
+        });
 
-      alert("資料已送出！");
-      fetchUsedSeats(); // 更新畫面
+        alert("資料已送出！");
+        fetchUsedSeats(); // 送出後重新載入比對狀態
+      } catch (err) {
+        console.error("送出失敗", err);
+        alert("送出失敗，請稍後再試");
+      }
     });
 
-    // 頁面載入時查詢
+    // 載入時即時比對
     fetchUsedSeats();
   </script>
 </body>
