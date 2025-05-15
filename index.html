@@ -76,7 +76,7 @@
   <button id="submit">送出資料</button>
 
   <script>
-    const scriptURL = "https://script.google.com/macros/s/YOUR_SCRIPT_URL/exec";
+    const scriptURL = "https://script.google.com/macros/s/AKfycbxP_3CAbNyIgY8ajUcFeN7Mf8tUAmoLIDyQKqMo-zHFLONZbvz9bDezcX6828dz3UlA/exec";
 
     const today = new Date().toISOString().split('T')[0];
     document.getElementById("date").value = today;
@@ -161,7 +161,7 @@
       const payload = { date, className, seats: selected };
 
       try {
-        await fetch("https://script.google.com/macros/s/AKfycbxP_3CAbNyIgY8ajUcFeN7Mf8tUAmoLIDyQKqMo-zHFLONZbvz9bDezcX6828dz3UlA/exec", {
+        await fetch(scriptURL, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(payload)
